@@ -61,7 +61,7 @@ void Resize::Run(cv::Mat* im, ImageBlob* data) {
   auto resize_scale = GenerateScale(*im);
   cv::resize(
       *im, *im, cv::Size(), resize_scale.first, resize_scale.second, interp_);
-  if (max_size_ != 0 && !image_shape_.empty()) {
+  if (max_size_ != 0) {
     // Padding the image with 0 border
     cv::copyMakeBorder(
       *im,
@@ -131,7 +131,7 @@ void PadStride::Run(cv::Mat* im, ImageBlob* data) {
 
 // Preprocessor op running order
 const std::vector<std::string> Preprocessor::RUN_ORDER = {
-  "Resize", "Normalize", "PadStride", "Permute"
+  "Resize", "Normalize", "PaddingImage", "Permute"
 };
 
 void Preprocessor::Run(cv::Mat* im, ImageBlob* data) {

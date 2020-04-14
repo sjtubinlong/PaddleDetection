@@ -36,8 +36,24 @@ class ConfigPaser {
 
   ~ConfigPaser() {}
 
+  std::string rename_model_arch(const std::string& arch) {
+    if (arch.find("YOLO") != std::string::npos) {
+      return "YOLO";
+    }
+    if (arch.find("RCNN") != std::string::npos) {
+      return "RCNN";
+    }
+    if (arch.find("RetinaNet") != std::string::npos) {
+      return "RetinaNet";
+    }
+    if (arch.find("SSD") != std::string::npos) {
+      return "SSD";
+    }
+    return "UNKNOWN";
+  }
+
   bool load_config(const std::string& model_dir,
-                   const std::string& cfg = "infer_cfg.yml") {
+                   const std::string& cfg = "model.yml") {
     // Load as a YAML::Node
     YAML::Node config;
     config = YAML::LoadFile(model_dir + OS_PATH_SEP + cfg);
@@ -46,15 +62,12 @@ class ConfigPaser {
     if (config["mode"].IsDefined()) {
       mode_ = config["mode"].as<std::string>();
     } else {
-      std::cerr << "Please set mode, "
-                << "support value : fluid/trt_int8/trt_fp16/trt_fp32."
-                << std::endl;
-      return false;
+      mode_ = "fluid";
     }
 
     // Get model arch : YOLO, SSD, RetinaNet, RCNN
-    if (config["arch"].IsDefined()) {
-      arch_ = config["arch"].as<std::string>();
+    if (config["Model"].IsDefined()) {
+      arch_ = rename_model_arch(config["Model"].as<std::string>());
     } else {
       std::cerr << "Please set model arch,"
                 << "support value : YOLO, SSD, RetinaNet, RCNN."
@@ -66,35 +79,34 @@ class ConfigPaser {
     if (config["min_subgraph_size"].IsDefined()) {
       min_subgraph_size_ = config["min_subgraph_size"].as<int>();
     } else {
-      std::cerr << "Please set min_subgraph_size." << std::endl;
-      return false;
+      min_subgraph_size_ = 3;
     }
     // Get draw_threshold for visualization
     if (config["draw_threshold"].IsDefined()) {
       draw_threshold_ = config["draw_threshold"].as<float>();
     } else {
-      std::cerr << "Please set draw_threshold." << std::endl;
-      return false;
+      draw_threshold_ = 0.5;
     }
+
     // Get with_background
     if (config["with_background"].IsDefined()) {
       with_background_ = config["with_background"].as<bool>();
     } else {
-      std::cerr << "Please set with_background." << std::endl;
-      return false;
+      with_background_ = false;
     }
     // Get Preprocess for preprocessing
-    if (config["Preprocess"].IsDefined()) {
-      preprocess_info_ = config["Preprocess"];
+    if (config["Transforms"].IsDefined()) {
+      preprocess_info_ = config["Transforms"];
     } else {
-      std::cerr << "Please set Preprocess." << std::endl;
+      std::cerr << "Please set Transforms." << std::endl;
       return false;
     }
     // Get label_list for visualization
-    if (config["label_list"].IsDefined()) {
-      label_list_ = config["label_list"].as<std::vector<std::string>>();
+    if (config["_Attributes"].IsDefined()) {
+      auto attrs = config["_Attributes"];
+      label_list_ = attrs["labels"].as<std::vector<std::string>>();
     } else {
-      std::cerr << "Please set label_list." << std::endl;
+      std::cerr << "Please set _Attributes.labels." << std::endl;
       return false;
     }
 

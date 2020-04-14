@@ -21,6 +21,7 @@
 #include <utility>
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -53,8 +54,8 @@ class Normalize : public PreprocessOp {
   virtual void Init(const YAML::Node& item, const std::string& arch) {
     mean_ = item["mean"].as<std::vector<float>>();
     scale_ = item["std"].as<std::vector<float>>();
-    is_channel_first_ = item["is_channel_first"].as<bool>();
-    is_scale_ = item["is_scale"].as<bool>();
+    is_channel_first_ = false;
+    is_scale_ = true;
   }
 
   virtual void Run(cv::Mat* im, ImageBlob* data);
@@ -71,7 +72,7 @@ class Permute : public PreprocessOp {
  public:
   virtual void Init(const YAML::Node& item, const std::string& arch) {
       to_bgr_ = item["to_bgr"].as<bool>();
-      is_channel_first_ = item["channel_first"].as<bool>();
+      is_channel_first_ = false;
   }
 
   virtual void Run(cv::Mat* im, ImageBlob* data);
@@ -85,12 +86,12 @@ class Permute : public PreprocessOp {
 
 class Resize : public PreprocessOp {
  public:
+
   virtual void Init(const YAML::Node& item, const std::string& arch) {
     arch_ = arch;
-    interp_ = item["interp"].as<int>();
+    interp_ = CvInterpMap(item["interp"].as<std::string>());
     max_size_ = item["max_size"].as<int>();
     target_size_ = item["target_size"].as<int>();
-    image_shape_ = item["image_shape"].as<std::vector<int>>();
   }
 
   // Compute best resize scale for x-dimension, y-dimension
@@ -98,19 +99,34 @@ class Resize : public PreprocessOp {
 
   virtual void Run(cv::Mat* im, ImageBlob* data);
 
+  int CvInterpMap(const std::string& str_interp) const {
+    if (str_interp == "NEAREST") {
+      return cv::INTER_NEAREST;
+    }
+    if (str_interp == "LANCZOS4") {
+      return cv::INTER_LANCZOS4;
+    }
+    if (str_interp == "AREA") {
+      return cv::INTER_AREA;
+    }
+    if (str_interp == "CUBIC") {
+      return cv::INTER_CUBIC;
+    }
+    return cv::INTER_LINEAR;
+  }
+
  private:
   std::string arch_;
   int interp_;
   int max_size_;
   int target_size_;
-  std::vector<int> image_shape_;
 };
 
 // Models with FPN need input shape % stride == 0
 class PadStride : public PreprocessOp {
  public:
   virtual void Init(const YAML::Node& item, const std::string& arch) {
-    stride_ = item["stride"].as<int>();
+    stride_ = item["coarsest_stride"].as<int>();
   }
 
   virtual void Run(cv::Mat* im, ImageBlob* data);
@@ -121,23 +137,31 @@ class PadStride : public PreprocessOp {
 
 class Preprocessor {
  public:
-  void Init(const YAML::Node& config_node, const std::string& arch) {
+  void Init(const YAML::Node& node, const std::string& arch) {
     arch_ = arch;
-    for (const auto& item : config_node) {
-      auto op_name = item["type"].as<std::string>();
-      ops_[op_name] = CreateOp(op_name);
-      ops_[op_name]->Init(item, arch);
+    std::unordered_set<std::string> valid_ops = {
+      "Resize", "ResizeByShort", "Permute", "Normalize", "PaddingImage"
+    };
+    for (const auto& item : node) {
+      auto op_name = item[0].as<std::string>();
+      if (valid_ops.count(op_name)) {
+        if (op_name.find("Resize") != std::string::npos) {
+          op_name = "Resize";
+        }
+        ops_[op_name] = CreateOp(op_name);
+        ops_[op_name]->Init(item[1], arch);
+      }
     }
   }
 
   std::shared_ptr<PreprocessOp> CreateOp(const std::string& name) {
-    if (name == "Resize") {
+    if (name.find("Resize") != std::string::npos) {
       return std::make_shared<Resize>();
     } else if (name == "Permute") {
       return std::make_shared<Permute>();
     } else if (name == "Normalize") {
       return std::make_shared<Normalize>();
-    } else if (name == "PadStride") {
+    } else if (name == "PaddingImage") {
       return std::make_shared<PadStride>();
     }
     return nullptr;

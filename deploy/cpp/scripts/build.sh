@@ -11,9 +11,9 @@ CUDA_LIB=/usr/local/cuda/lib64/
 
 sh $(pwd)/scripts/bootstrap.sh
 
-rm -rf build
 mkdir -p build
 cd build
+make clean
 cmake .. \
     -DWITH_GPU=OFF \
     -DWITH_TENSORRT=OFF \
