@@ -217,7 +217,7 @@ add_executable(main src/main.cc src/preprocess_op.cc src/object_detector.cc)
 ADD_DEPENDENCIES(main ext-yaml-cpp)
 target_link_libraries(main ${DEPS})
 
-if (WIN32)
+if (WIN32 AND WITH_MKL)
     add_custom_command(TARGET main POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PADDLE_DIR}/third_party/install/mklml/lib/mklml.dll ./mklml.dll
         COMMAND ${CMAKE_COMMAND} -E copy_if_different ${PADDLE_DIR}/third_party/install/mklml/lib/libiomp5md.dll ./libiomp5md.dll
